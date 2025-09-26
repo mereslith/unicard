@@ -13,9 +13,7 @@
     main { padding: 16px; max-width: 800px; margin: 0 auto; }
     .card { background:#fff; border-radius: 14px; padding: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.06); margin-bottom: var(--gap); }
     label { font-weight: 600; display:block; margin-bottom: 8px; }
-    input[type="number"] {
-      width: 100%; padding: 12px 14px; border:1px solid #ddd; border-radius: 12px; font-size: 16px; background:#fff;
-    }
+    input[type="number"] { width: 100%; padding: 12px 14px; border:1px solid #ddd; border-radius: 12px; font-size: 16px; background:#fff; }
     .grid { display: grid; gap: var(--gap); }
     @media (min-width: 720px) { .grid { grid-template-columns: repeat(3, 1fr); } }
     .plan-title { font-weight: 700; font-size: 18px; margin-bottom: 6px; display:flex; align-items:center; gap:8px; }
@@ -39,36 +37,45 @@
     <div class="card">
       <label for="amount">消費金額（NT$）：</label>
       <input id="amount" type="number" inputmode="decimal" placeholder="例如 200" value="200" />
-      <div class="hint">計算規則：每一項回饋（<b>基礎0.30%</b>、<b>玉山銀自行扣繳0.70%</b>、<b>加碼</b>）各自四捨五入到元，再相加為合計。</div>
+      <div class="hint">計算規則：Unicard 的各項回饋（<b>基礎0.30%</b>、<b>玉山銀自行扣繳0.70%</b>、<b>加碼</b>）各自四捨五入到元，再相加為合計；Richart 為單一總回饋四捨五入。</div>
     </div>
 
     <div class="grid" id="results">
-      <!-- 方案卡片會由 JS 動態產生 -->
+      <!-- 方案卡片由 JS 動態產生 -->
     </div>
 
     <div class="card muted">
-      方案加碼比率：簡單選 <b>2%</b>、任意選 <b>2.5%</b>、Up選 <b>3.5%</b>（皆為額外加碼，基礎與自行扣繳另計；分期無基礎與自扣回饋）  
+      方案加碼比率（參考）：簡單選 <b>2%</b>、任意選 <b>2.5%</b>、Up選 <b>3.5%</b>；另提供 <b>台新 Richart 3.3%</b>（單一回饋）。
     </div>
   </main>
 
   <script>
+    // 方案設定
     const plans = [
-      { key: 'simple', name: '簡單選', bonusRate: 0.02 },
-      { key: 'any',    name: '任意選', bonusRate: 0.025 },
-      { key: 'up',     name: 'Up選',   bonusRate: 0.035 },
+      { key: 'simple',  name: '簡單選',     bonusRate: 0.02,  type: 'unicard' },
+      { key: 'any',     name: '任意選',     bonusRate: 0.025, type: 'unicard' },
+      { key: 'up',      name: 'Up選',       bonusRate: 0.035, type: 'unicard' },
+      { key: 'richart', name: '台新Richart',bonusRate: 0.033, type: 'single' }, // 新增
     ];
 
-    const BASE_RATE = 0.003;   // 基礎回饋 (電子帳單)
+    // Unicard 基礎比率
+    const BASE_RATE = 0.003;    // 基礎回饋 (電子帳單)
     const AUTOPAY_RATE = 0.007; // 玉山銀自行扣繳
 
     const fmtNTD = (n) => 'NT$' + (isNaN(n) ? '-' : n.toLocaleString('zh-Hant-TW'));
-    const rint = (x) => Math.round(x); // 四捨五入到整數元
+    const rint = (x) => Math.round(x); // 四捨五入至整數元
 
-    function calc(amount, bonusRate) {
-      const base   = rint(amount * BASE_RATE);
-      const autopay= rint(amount * AUTOPAY_RATE);
-      const bonus  = rint(amount * bonusRate);
-      const total  = base + autopay + bonus;
+    // 統一計算入口
+    function calc(amount, plan) {
+      if (plan.type === 'single') {
+        const reward = rint(amount * plan.bonusRate);
+        return { base: 0, autopay: 0, bonus: reward, total: reward };
+      }
+      // Unicard 三段相加
+      const base    = rint(amount * BASE_RATE);
+      const autopay = rint(amount * AUTOPAY_RATE);
+      const bonus   = rint(amount * plan.bonusRate);
+      const total   = base + autopay + bonus;
       return { base, autopay, bonus, total };
     }
 
@@ -77,11 +84,39 @@
       container.innerHTML = '';
 
       plans.forEach(p => {
-        const { base, autopay, bonus, total } = calc(amount, p.bonusRate);
+        const { base, autopay, bonus, total } = calc(amount, p);
 
         const card = document.createElement('div');
         card.className = 'card';
 
+        // Richart（單一回饋）卡片
+        if (p.type === 'single') {
+          card.innerHTML = `
+            <div class="plan-title">
+              <span>${p.name}</span>
+              <span class="badge">回饋 ${(p.bonusRate*100).toFixed(1).replace('.0','')}%</span>
+            </div>
+            <table>
+              <tbody>
+                <tr>
+                  <td>${p.name} 回饋（${(p.bonusRate*100).toFixed(1).replace('.0','')}%）</td>
+                  <td>${fmtNTD(bonus)}</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td>合計</td>
+                  <td class="tot">${fmtNTD(total)}</td>
+                </tr>
+              </tfoot>
+            </table>
+            <div class="hint">示例（金額=${fmtNTD(amount)}）：回饋金額已四捨五入。</div>
+          `;
+          container.appendChild(card);
+          return;
+        }
+
+        // Unicard（拆解）卡片
         card.innerHTML = `
           <div class="plan-title">
             <span>${p.name}</span>
@@ -120,7 +155,7 @@
     const initial = parseFloat(amountInput.value) || 0;
     render(initial);
 
-    // 輸入即時計算（含簡單去抖）
+    // 輸入即時計算（含去抖）
     let t = null;
     amountInput.addEventListener('input', () => {
       clearTimeout(t);
@@ -136,6 +171,3 @@
   </script>
 </body>
 </html>
-
-
-
