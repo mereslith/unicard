@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Unicard 回饋計算器（含拆解）</title>
+  <title>Unicard 回饋計算器（一般1% + 加碼）</title>
   <style>
     :root { --gap: 14px; }
     * { box-sizing: border-box; }
@@ -24,7 +24,7 @@
     th, td { padding: 8px 6px; text-align: right; border-bottom:1px dashed #eee; font-variant-numeric: tabular-nums; }
     th:first-child, td:first-child { text-align: left; color:#475569; }
     tfoot td { font-weight: 800; border-bottom: none; }
-    .muted { color:#64748b; font-size: 13px; }
+    .muted { color:#64748b; font-size: 13px; white-space: pre-line; }
     .tot { font-size: 20px; }
     .row { display:flex; gap: 8px; align-items:center; }
     .hint { font-size: 12px; color:#64748b; margin-top: 8px; }
@@ -32,22 +32,25 @@
 </head>
 <body>
   <header>
-    <h1>💳 Unicard 回饋計算器（含拆解）</h1>
+    <h1>💳 Unicard 回饋計算器（一般1% + 方案加碼）</h1>
   </header>
 
   <main>
     <div class="card">
       <label for="amount">消費金額（NT$）：</label>
       <input id="amount" type="number" inputmode="decimal" placeholder="例如 200" value="200" />
-      <div class="hint">計算規則：每一項回饋（<b>基礎0.30%</b>、<b>玉山銀自行扣繳0.70%</b>、<b>加碼</b>）各自四捨五入到元，再相加為合計。</div>
+      <div class="hint">計算規則：<b>一般消費 1%</b> 與 <b>方案加碼</b> 各自四捨五入到整數元後，再相加為合計。</div>
     </div>
 
     <div class="grid" id="results">
-      <!-- 方案卡片會由 JS 動態產生 -->
+      <!-- 方案卡片由 JS 產生 -->
     </div>
 
     <div class="card muted">
-      方案加碼比率：簡單選 <b>2%</b>、任意選 <b>2.5%</b>、Up選 <b>3.5%</b>（皆為額外加碼，比基礎與自行扣繳另計）  
+方案加碼比率：
+簡單選3%：百大特店+2%，上限1000點=50,000/月
+任意選3.5%：任選8家特店+2.5%，上限1000點=40,000/月
+UP選4.5%(訂閱費149)：百大特店+3.5%，上限5000點=142,857/月
     </div>
   </main>
 
@@ -58,18 +61,17 @@
       { key: 'up',     name: 'Up選',   bonusRate: 0.035 },
     ];
 
-    const BASE_RATE = 0.003;   // 基礎回饋 (電子帳單)
-    const AUTOPAY_RATE = 0.007; // 玉山銀自行扣繳
+    // 新規則：一般消費 1%
+    const GENERAL_RATE = 0.01;
 
     const fmtNTD = (n) => 'NT$' + (isNaN(n) ? '-' : n.toLocaleString('zh-Hant-TW'));
     const rint = (x) => Math.round(x); // 四捨五入到整數元
 
     function calc(amount, bonusRate) {
-      const base   = rint(amount * BASE_RATE);
-      const autopay= rint(amount * AUTOPAY_RATE);
-      const bonus  = rint(amount * bonusRate);
-      const total  = base + autopay + bonus;
-      return { base, autopay, bonus, total };
+      const general = rint(amount * GENERAL_RATE);
+      const bonus   = rint(amount * bonusRate);
+      const total   = general + bonus;
+      return { general, bonus, total };
     }
 
     function render(amount) {
@@ -77,7 +79,7 @@
       container.innerHTML = '';
 
       plans.forEach(p => {
-        const { base, autopay, bonus, total } = calc(amount, p.bonusRate);
+        const { general, bonus, total } = calc(amount, p.bonusRate);
 
         const card = document.createElement('div');
         card.className = 'card';
@@ -90,12 +92,8 @@
           <table>
             <tbody>
               <tr>
-                <td>基礎回饋（0.30%）</td>
-                <td>${fmtNTD(base)}</td>
-              </tr>
-              <tr>
-                <td>玉山銀自行扣繳（0.70%）</td>
-                <td>${fmtNTD(autopay)}</td>
+                <td>一般消費（1%）</td>
+                <td>${fmtNTD(general)}</td>
               </tr>
               <tr>
                 <td>加碼回饋（${(p.bonusRate*100).toFixed(1).replace('.0','')}%）</td>
@@ -120,7 +118,7 @@
     const initial = parseFloat(amountInput.value) || 0;
     render(initial);
 
-    // 輸入即時計算（含簡單去抖）
+    // 輸入即時計算（含去抖）
     let t = null;
     amountInput.addEventListener('input', () => {
       clearTimeout(t);
