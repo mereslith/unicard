@@ -3,20 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Unicard 回饋計算器（含拆解）</title>
+  <title>Unicard 回饋計算器（含封頂）</title>
   <style>
     :root { --gap: 14px; }
     * { box-sizing: border-box; }
     body { font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,Helvetica,sans-serif; margin: 0; background:#f7f7f8; color:#222; }
     header { padding: 18px 16px; text-align: center; background: #fff; position: sticky; top: 0; z-index: 2; border-bottom:1px solid #eee; }
     h1 { font-size: 20px; margin: 0; }
-    main { padding: 16px; max-width: 800px; margin: 0 auto; }
+    main { padding: 16px; max-width: 980px; margin: 0 auto; }
     .card { background:#fff; border-radius: 14px; padding: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.06); margin-bottom: var(--gap); }
     label { font-weight: 600; display:block; margin-bottom: 8px; }
-    input[type="number"] { width: 100%; padding: 12px 14px; border:1px solid #ddd; border-radius: 12px; font-size: 16px; background:#fff; }
-    .grid { display: grid; gap: var(--gap); }
-    @media (min-width: 720px) { .grid { grid-template-columns: repeat(3, 1fr); } }
-    .plan-title { font-weight: 700; font-size: 18px; margin-bottom: 6px; display:flex; align-items:center; gap:8px; }
+    input[type="number"]{
+      width: 100%; padding: 12px 14px; border:1px solid #ddd; border-radius: 12px; font-size: 16px; background:#fff;
+    }
+    .row { display:grid; grid-template-columns: 1fr; gap: var(--gap); }
+    @media (min-width: 720px){ .row { grid-template-columns: 1fr 1fr 1fr; } }
+    .plan-title { font-weight: 700; font-size: 18px; margin-bottom: 6px; display:flex; align-items:center; gap:8px; justify-content: space-between; }
     .badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; }
     table { width: 100%; border-collapse: collapse; margin-top: 8px; }
     th, td { padding: 8px 6px; text-align: right; border-bottom:1px dashed #eee; font-variant-numeric: tabular-nums; }
@@ -24,151 +26,165 @@
     tfoot td { font-weight: 800; border-bottom: none; }
     .muted { color:#64748b; font-size: 13px; }
     .tot { font-size: 20px; }
-    .row { display:flex; gap: 8px; align-items:center; }
     .hint { font-size: 12px; color:#64748b; margin-top: 8px; }
+    details { margin-top: 10px; }
+    summary { cursor: pointer; color:#334155; }
+    .switch { display:flex; align-items:center; gap:10px; margin-top: 8px; }
+    .switch input { width:auto; }
+    .caps { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top: 8px;}
   </style>
 </head>
 <body>
-  <header>
-    <h1>💳 Unicard 回饋計算器（含拆解）</h1>
-  </header>
+<header>
+  <h1>💳 Unicard 回饋計算器（封頂 + 拆解）</h1>
+</header>
 
-  <main>
-    <div class="card">
-      <label for="amount">消費金額（NT$）：</label>
-      <input id="amount" type="number" inputmode="decimal" placeholder="例如 200" value="200" />
-      <div class="hint">計算規則：Unicard 的各項回饋（<b>基礎0.30%</b>、<b>玉山銀自行扣繳0.70%</b>、<b>加碼</b>）各自四捨五入到元，再相加為合計；Richart 為單一總回饋四捨五入。</div>
+<main>
+  <div class="card">
+    <label for="amount">本次消費金額（NT$）：</label>
+    <input id="amount" type="number" inputmode="decimal" placeholder="例如 200" value="200" />
+    <div class="switch">
+      <input id="useOctRule" type="checkbox" />
+      <label for="useOctRule">使用「10月起新上限」</label>
     </div>
-
-    <div class="grid" id="results">
-      <!-- 方案卡片由 JS 動態產生 -->
+    <div class="hint">
+      規則：每項回饋（基礎0.30%／自扣0.70%／加碼）各自四捨五入到元後再相加。封頂僅限制「加碼回饋」。
     </div>
+  </div>
 
-    <div class="card muted">
-      方案加碼比率（參考）：簡單選 <b>2%</b>、任意選 <b>2.5%</b>、Up選（扣149點升級） <b>3.5%</b>；另提供 <b>台新 Richart 3.3%</b>（單一回饋）。
-    </div>
-  </main>
+  <div class="row" id="results"></div>
 
-  <script>
-    // 方案設定
-    const plans = [
-      { key: 'simple',  name: '簡單選',     bonusRate: 0.02,  type: 'unicard' },
-      { key: 'any',     name: '任意選',     bonusRate: 0.025, type: 'unicard' },
-      { key: 'up',      name: 'Up選',       bonusRate: 0.035, type: 'unicard' },
-      { key: 'richart', name: '台新Richart',bonusRate: 0.033, type: 'single' }, // 新增
-    ];
+  <div class="card muted">
+    上限說明（每月 / 日曆月）：<br>
+    簡單選：回饋上限 500（10月起 1000），可計入消費 25,000（10月起 50,000）<br>
+    任意選：回饋上限 500（10月起 1000），可計入消費 20,000（10月起 40,000）<br>
+    Up選　：回饋上限 2000（10月起 5000），可計入消費 57,142（10月起 142,857）
+  </div>
+</main>
 
-    // Unicard 基礎比率
-    const BASE_RATE = 0.003;    // 基礎回饋 (電子帳單)
-    const AUTOPAY_RATE = 0.007; // 玉山銀自行扣繳
+<script>
+  const BASE_RATE = 0.003;
+  const AUTOPAY_RATE = 0.007;
 
-    const fmtNTD = (n) => 'NT$' + (isNaN(n) ? '-' : n.toLocaleString('zh-Hant-TW'));
-    const rint = (x) => Math.round(x); // 四捨五入至整數元
+  const plans = [
+    { key: 'simple', name: '簡單選', bonusRate: 0.02,
+      caps: { base: { cashback: 500, spend: 25000 }, oct: { cashback: 1000, spend: 50000 } } },
+    { key: 'any',    name: '任意選', bonusRate: 0.025,
+      caps: { base: { cashback: 500, spend: 20000 }, oct: { cashback: 1000, spend: 40000 } } },
+    { key: 'up',     name: 'Up選',   bonusRate: 0.035,
+      caps: { base: { cashback: 2000, spend: 57142 }, oct: { cashback: 5000, spend: 142857 } } },
+  ];
 
-    // 統一計算入口
-    function calc(amount, plan) {
-      if (plan.type === 'single') {
-        const reward = rint(amount * plan.bonusRate);
-        return { base: 0, autopay: 0, bonus: reward, total: reward };
-      }
-      // Unicard 三段相加
-      const base    = rint(amount * BASE_RATE);
-      const autopay = rint(amount * AUTOPAY_RATE);
-      const bonus   = rint(amount * plan.bonusRate);
-      const total   = base + autopay + bonus;
-      return { base, autopay, bonus, total };
-    }
+  const rint = n => Math.round(n);
+  const fmt = n => isNaN(n) ? '-' : 'NT$' + n.toLocaleString('zh-Hant-TW');
 
-    function render(amount) {
-      const container = document.getElementById('results');
-      container.innerHTML = '';
+  function defaultUseOctRule() {
+    const now = new Date();
+    return now.getMonth() + 1 >= 10;
+  }
 
-      plans.forEach(p => {
-        const { base, autopay, bonus, total } = calc(amount, p);
+  function calcPlan(amount, plan, useOctRule, used) {
+    const base = rint(amount * BASE_RATE);
+    const autopay = rint(amount * AUTOPAY_RATE);
 
-        const card = document.createElement('div');
-        card.className = 'card';
+    const capSet = useOctRule ? plan.caps.oct : plan.caps.base;
+    const remainBonusCash = Math.max(0, capSet.cashback - (used.usedBonusCash || 0));
+    const remainBonusSpend = Math.max(0, capSet.spend - (used.usedBonusSpend || 0));
 
-        // Richart（單一回饋）卡片
-        if (p.type === 'single') {
-          card.innerHTML = `
-            <div class="plan-title">
-              <span>${p.name}</span>
-              <span class="badge">回饋 ${(p.bonusRate*100).toFixed(1).replace('.0','')}%</span>
-            </div>
-            <table>
-              <tbody>
-                <tr>
-                  <td>${p.name} 回饋（${(p.bonusRate*100).toFixed(1).replace('.0','')}%）</td>
-                  <td>${fmtNTD(bonus)}</td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td>合計</td>
-                  <td class="tot">${fmtNTD(total)}</td>
-                </tr>
-              </tfoot>
-            </table>
-            <div class="hint">示例（金額=${fmtNTD(amount)}）：回饋金額已四捨五入。</div>
-          `;
-          container.appendChild(card);
-          return;
-        }
+    const eligibleSpend = Math.min(amount, remainBonusSpend);
+    const bonusRounded = rint(eligibleSpend * plan.bonusRate);
+    const bonus = Math.min(bonusRounded, remainBonusCash);
 
-        // Unicard（拆解）卡片
-        card.innerHTML = `
-          <div class="plan-title">
-            <span>${p.name}</span>
-            <span class="badge">加碼 ${ (p.bonusRate*100).toFixed(1).replace('.0','') }%</span>
-          </div>
-          <table>
-            <tbody>
-              <tr>
-                <td>基礎回饋（0.30%）</td>
-                <td>${fmtNTD(base)}</td>
-              </tr>
-              <tr>
-                <td>玉山銀自行扣繳（0.70%）</td>
-                <td>${fmtNTD(autopay)}</td>
-              </tr>
-              <tr>
-                <td>加碼回饋（${(p.bonusRate*100).toFixed(1).replace('.0','')}%）</td>
-                <td>${fmtNTD(bonus)}</td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr>
-                <td>合計</td>
-                <td class="tot">${fmtNTD(total)}</td>
-              </tr>
-            </tfoot>
-          </table>
-          <div class="hint">示例（金額=${fmtNTD(amount)}）：各項金額均已四捨五入後再相加。</div>
-        `;
-        container.appendChild(card);
-      });
-    }
+    return { caps: capSet, base, autopay, bonus, total: base + autopay + bonus,
+             eligibleSpend, remainBonusCash, remainBonusSpend };
+  }
 
-    // 初始渲染
-    const amountInput = document.getElementById('amount');
-    const initial = parseFloat(amountInput.value) || 0;
-    render(initial);
+  function renderPlan(container, amount, plan, useOctRule) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const usedBonusCashId = `${plan.key}-usedBonusCash`;
+    const usedBonusSpendId = `${plan.key}-usedBonusSpend`;
 
-    // 輸入即時計算（含去抖）
-    let t = null;
-    amountInput.addEventListener('input', () => {
-      clearTimeout(t);
-      t = setTimeout(() => {
-        const amt = parseFloat(amountInput.value);
-        if (isNaN(amt) || amt <= 0) {
-          render(0);
-        } else {
-          render(amt);
-        }
-      }, 120);
+    card.innerHTML = `
+      <div class="plan-title">
+        <span>${plan.name}</span>
+        <span class="badge">加碼 ${(plan.bonusRate*100).toFixed(1).replace('.0','')}%</span>
+      </div>
+      <div class="caps">
+        <div>
+          <label for="${usedBonusCashId}">本月已用「加碼回饋」(元)</label>
+          <input id="${usedBonusCashId}" type="number" value="0" />
+        </div>
+        <div>
+          <label for="${usedBonusSpendId}">本月已計入「加碼消費」(元)</label>
+          <input id="${usedBonusSpendId}" type="number" value="0" />
+        </div>
+      </div>
+      <table style="margin-top:12px">
+        <tbody>
+          <tr><td>基礎回饋（0.30%）</td><td id="${plan.key}-base"></td></tr>
+          <tr><td>自行扣繳（0.70%）</td><td id="${plan.key}-autopay"></td></tr>
+          <tr><td>加碼回饋</td><td id="${plan.key}-bonus"></td></tr>
+        </tbody>
+        <tfoot>
+          <tr><td>合計</td><td id="${plan.key}-total" class="tot"></td></tr>
+        </tfoot>
+      </table>
+      <div class="hint" id="${plan.key}-hint"></div>
+      <details>
+        <summary>查看本月上限 / 剩餘</summary>
+        <div class="muted" id="${plan.key}-caps"></div>
+      </details>
+    `;
+    container.appendChild(card);
+
+    const usedInputs = () => ({
+      usedBonusCash: parseFloat(document.getElementById(usedBonusCashId).value) || 0,
+      usedBonusSpend: parseFloat(document.getElementById(usedBonusSpendId).value) || 0,
     });
-  </script>
+
+    const update = () => {
+      const used = usedInputs();
+      const r = calcPlan(amount, plan, useOctRule, used);
+
+      document.getElementById(`${plan.key}-base`).textContent = fmt(r.base);
+      document.getElementById(`${plan.key}-autopay`).textContent = fmt(r.autopay);
+      document.getElementById(`${plan.key}-bonus`).textContent = fmt(r.bonus);
+      document.getElementById(`${plan.key}-total`).textContent = fmt(r.total);
+
+      let h = `本次消費：${fmt(amount)}；加碼可計入消費：${fmt(r.eligibleSpend)}`;
+      if (r.eligibleSpend < amount) h += `（受消費上限剩餘 ${fmt(r.remainBonusSpend)} 限制）`;
+      if (r.bonus < rint(Math.min(amount, r.remainBonusSpend) * plan.bonusRate)) {
+        h += ` 加碼回饋受回饋上限剩餘 ${fmt(r.remainBonusCash)} 限制`;
+      }
+      document.getElementById(`${plan.key}-hint`).textContent = h;
+
+      document.getElementById(`${plan.key}-caps`).textContent =
+        `本月上限（加碼）：回饋 ${fmt(r.caps.cashback)}；可計入消費 ${fmt(r.caps.spend)}。` +
+        ` 已用回饋 ${fmt(used.usedBonusCash)}；已計入消費 ${fmt(used.usedBonusSpend)}。` +
+        ` 剩餘回饋 ${fmt(r.remainBonusCash)}；剩餘可計入消費 ${fmt(r.remainBonusSpend)}。`;
+    };
+
+    document.getElementById(usedBonusCashId).addEventListener('input', update);
+    document.getElementById(usedBonusSpendId).addEventListener('input', update);
+    update();
+  }
+
+  function renderAll() {
+    const amount = parseFloat(document.getElementById('amount').value) || 0;
+    const useOctRule = document.getElementById('useOctRule').checked;
+    const container = document.getElementById('results');
+    container.innerHTML = '';
+    plans.forEach(p => renderPlan(container, amount, p, useOctRule));
+  }
+
+  document.getElementById('useOctRule').checked = defaultUseOctRule();
+  document.getElementById('amount').addEventListener('input', () => {
+    clearTimeout(window.__t);
+    window.__t = setTimeout(renderAll, 120);
+  });
+  document.getElementById('useOctRule').addEventListener('change', renderAll);
+  renderAll();
+</script>
 </body>
 </html>
-
